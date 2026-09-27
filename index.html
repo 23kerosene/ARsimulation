@@ -11,6 +11,65 @@
   <!-- AR.js for A-Frame -->
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
 
+    <!--glitch effect-->
+  <script>
+function glitchEffect(ctx, canvas, intensity = 0.4) {
+  const w = canvas.width, h = canvas.height;
+  const amt = Math.max(0, Math.min(1, intensity));
+  if (amt <= 0) return;
+
+  const frame = ctx.getImageData(0, 0, w, h);
+  const data = frame.data;
+  const shift = Math.round(amt * 12);
+  if (shift > 0) {
+    const copy = new Uint8ClampedArray(data);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 4;
+        const rx = Math.min(w - 1, x + shift);
+        const bx = Math.max(0, x - shift);
+        data[idx]     = copy[(y * w + rx) * 4];
+        data[idx + 2] = copy[(y * w + bx) * 4 + 2];
+      }
+    }
+  }
+  ctx.putImageData(frame, 0, 0);
+
+  const sliceCount = Math.round(amt * 8);
+  for (let i = 0; i < sliceCount; i++) {
+    if (Math.random() > 0.5) continue;
+    const sy = Math.floor(Math.random() * h);
+    const sh = Math.max(2, Math.floor(Math.random() * h * 0.08));
+    const dx = Math.floor((Math.random() - 0.5) * amt * 60);
+    ctx.drawImage(canvas, 0, sy, w, sh, dx, sy, w, sh);
+  }
+
+  ctx.globalAlpha = 0.15 * amt;
+  ctx.fillStyle = '#000';
+  for (let y = 0; y < h; y += 3) ctx.fillRect(0, y, w, 1);
+  ctx.globalAlpha = 1;
+
+  if (Math.random() < amt * 0.15) {
+    const nd = ctx.getImageData(0, 0, w, h);
+    const nData = nd.data;
+    for (let i = 0; i < nData.length; i += 4) {
+      if (Math.random() < 0.02) {
+        const v = Math.random() * 255;
+        nData[i] = v; nData[i + 1] = v; nData[i + 2] = v;
+      }
+    }
+    ctx.putImageData(nd, 0, 0);
+  }
+
+  if (Math.random() < amt * 0.08) {
+    ctx.globalAlpha = 0.1;
+    ctx.fillStyle = Math.random() < 0.5 ? '#ff003c' : '#00e5ff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalAlpha = 1;
+  }
+}
+</script>
+
   <style>
     body { margin: 0; overflow: hidden; }
     .arjs-loader {
@@ -26,6 +85,8 @@
     }
   </style>
 </head>
+
+
 <body style="margin: 0; overflow: hidden;">
 
   <div class="arjs-loader">
@@ -48,6 +109,8 @@
       ></a-entity>
     </a-marker>
 
+    glitchEffect(ctx, canvas, 0.45); // 3rd param = intensity, 0 to 1
+
     <a-entity camera></a-entity>
   </a-scene>
 
@@ -57,91 +120,7 @@
       document.querySelector('.arjs-loader').style.display = 'none';
     });
 
-    /**
- * glitchEffect(ctx, canvas, intensity)
- * Applies an RGB-shift / slice-displacement / scanline / noise glitch
- * to whatever is currently drawn on a 2D canvas. Call it once per frame,
- * right after you've drawn your source content (video, image, etc.) to it.
- *
- * @param {CanvasRenderingContext2D} ctx - context of the canvas to glitch
- * @param {HTMLCanvasElement} canvas     - the canvas itself (for width/height)
- * @param {number} intensity             - 0 to 1, how strong the effect is
- *
- * Usage:
- *   const ctx = canvas.getContext('2d', { willReadFrequently: true });
- *   function loop() {
- *     ctx.drawImage(videoOrImageSource, 0, 0, canvas.width, canvas.height);
- *     glitchEffect(ctx, canvas, 0.45);
- *     requestAnimationFrame(loop);
- *   }
- *   loop();
- */
-function glitchEffect(ctx, canvas, intensity = 0.4) {
-  const w = canvas.width, h = canvas.height;
-  const amt = Math.max(0, Math.min(1, intensity));
-  if (amt <= 0) return;
-
-  const frame = ctx.getImageData(0, 0, w, h);
-  const data = frame.data;
-
-  // RGB channel shift
-  const shift = Math.round(amt * 12);
-  if (shift > 0) {
-    const copy = new Uint8ClampedArray(data);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const idx = (y * w + x) * 4;
-        const rx = Math.min(w - 1, x + shift);
-        const bx = Math.max(0, x - shift);
-        data[idx]     = copy[(y * w + rx) * 4];     // R shifted right
-        data[idx + 2] = copy[(y * w + bx) * 4 + 2]; // B shifted left
-      }
-    }
-  }
-  ctx.putImageData(frame, 0, 0);
-
-  // Random horizontal slice displacement
-  const sliceCount = Math.round(amt * 8);
-  for (let i = 0; i < sliceCount; i++) {
-    if (Math.random() > 0.5) continue;
-    const sy = Math.floor(Math.random() * h);
-    const sh = Math.max(2, Math.floor(Math.random() * h * 0.08));
-    const dx = Math.floor((Math.random() - 0.5) * amt * 60);
-    ctx.drawImage(canvas, 0, sy, w, sh, dx, sy, w, sh);
-  }
-
-  // Scanlines
-  ctx.globalAlpha = 0.15 * amt;
-  ctx.fillStyle = '#000';
-  for (let y = 0; y < h; y += 3) {
-    ctx.fillRect(0, y, w, 1);
-  }
-  ctx.globalAlpha = 1;
-
-  // Occasional noise burst
-  if (Math.random() < amt * 0.15) {
-    const nd = ctx.getImageData(0, 0, w, h);
-    const nData = nd.data;
-    for (let i = 0; i < nData.length; i += 4) {
-      if (Math.random() < 0.02) {
-        const v = Math.random() * 255;
-        nData[i] = v; nData[i + 1] = v; nData[i + 2] = v;
-      }
-    }
-    ctx.putImageData(nd, 0, 0);
-  }
-
-  // Subtle color flash tint
-  if (Math.random() < amt * 0.08) {
-    ctx.globalAlpha = 0.1;
-    ctx.fillStyle = Math.random() < 0.5 ? '#ff003c' : '#00e5ff';
-    ctx.fillRect(0, 0, w, h);
-    ctx.globalAlpha = 1;
-  }
-}
-
-// Uncomment if using as an ES module:
-// export default glitchEffect;
+    
   </script>
 
 </body>
