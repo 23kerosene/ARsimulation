@@ -1,2 +1,2 @@
-# AR-simulation
+# ARsimulation
 
