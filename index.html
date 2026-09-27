@@ -101,6 +101,9 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
   </div>
 
   <canvas id="outputCanvas" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 5;"></canvas>
+  <button id="rawViewToggle" style="position: fixed; top: 8px; right: 8px; z-index: 10001; font: 12px sans-serif; padding: 6px 10px;">
+    Show raw A-Frame view
+  </button>
   <div id="debugOverlay"></div>
 
   <a-scene
@@ -137,6 +140,18 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
   </a-scene>
 
   <script>
+    // TEMP DIAGNOSTIC: toggle the compositing canvas off entirely, so you can
+    // see A-Frame/AR.js's native render (no glitch, no custom compositing)
+    // underneath. If the model shows up here but never in the composited
+    // view, the bug is in the compositing/glitch pipeline, not the 3D scene.
+    const rawViewToggle = document.getElementById('rawViewToggle');
+    let showingRaw = false;
+    rawViewToggle.addEventListener('click', function () {
+      showingRaw = !showingRaw;
+      outputCanvas.style.display = showingRaw ? 'none' : 'block';
+      rawViewToggle.textContent = showingRaw ? 'Show glitch/composited view' : 'Show raw A-Frame view';
+    });
+
     // Hide loader once the scene is ready
     document.querySelector('a-scene').addEventListener('loaded', function () {
       document.querySelector('.arjs-loader').style.display = 'none';
