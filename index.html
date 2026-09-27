@@ -11,6 +11,44 @@
   <!-- AR.js for A-Frame -->
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
 
+  <script>
+    // AR.js configures its own renderer internally for camera-based AR and does
+    // not reliably pass through A-Frame's renderer="preserveDrawingBuffer: true"
+    // attribute. Without preserveDrawingBuffer actually being true on the real
+    // WebGL context, the browser is allowed to clear the drawing buffer the
+    // moment a frame is presented - so by the time an independent script reads
+    // the canvas via drawImage(), it can consistently capture an already-cleared
+    // (transparent) buffer, even though A-Frame's own on-screen render looks
+    // completely normal. This patches every WebGL context creation to force it.
+    (function () {
+      var origGetContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (type, attribs) {
+        if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+          attribs = attribs || {};
+          attribs.preserveDrawingBuffer = true;
+        }
+        return origGetContext.call(this, type, attribs);
+      };
+    })();
+
+    // Composite video + the rendered 3D scene immediately after A-Frame finishes
+    // rendering each frame (the "tock" lifecycle method runs right after
+    // sceneEl.renderer.render() for that frame), rather than on an independent
+    // requestAnimationFrame loop whose timing relative to A-Frame's own render
+    // isn't guaranteed.
+    AFRAME.registerComponent('canvas-compositor', {
+      init: function () {
+        this.outputCanvas = document.getElementById('outputCanvas');
+        this.outCtx = this.outputCanvas.getContext('2d');
+      },
+      tock: function () {
+        if (typeof window.compositeFrame === 'function') {
+          window.compositeFrame(this.el, this.outputCanvas, this.outCtx);
+        }
+      }
+    });
+  </script>
+
   <!--glitch Effect-->
   <script>
 function glitchEffect(ctx, canvas, intensity = 0.4) {
@@ -114,6 +152,7 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
     embedded
     arjs="sourceType: webcam; debugUIEnabled: false;"
     renderer="logarithmicDepthBuffer: true; preserveDrawingBuffer: true; alpha: true;"
+    canvas-compositor
   >
     <!-- Marker: default "Hiro" pattern marker -->
     <a-marker preset="hiro">
@@ -171,17 +210,6 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
     // Hide loader once the scene is ready
     document.querySelector('a-scene').addEventListener('loaded', function () {
       document.querySelector('.arjs-loader').style.display = 'none';
-
-      // Force a solid, distinctive background instead of relying on the
-      // WebGL canvas's alpha channel surviving the copy into our 2D canvas
-      // (that channel is premultiplied internally and drawImage from a
-      // WebGL canvas into a 2D canvas doesn't reliably un-premultiply it
-      // across all browsers). We chroma-key this exact color out manually
-      // in extractModelLayer() below instead.
-      const sceneEl = document.querySelector('a-scene');
-      if (sceneEl.object3D) {
-        sceneEl.object3D.background = new THREE.Color(1, 0, 1); // magenta
-      }
     });
 
     // TEMP DIAGNOSTIC: surface glTF load success/failure on screen.
@@ -246,9 +274,10 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
       });
     });
 
-    // Continuously draw the camera video + WebGL scene onto a single canvas
+    // Composite video + WebGL scene onto our own canvas. Called from the
+    // canvas-compositor component's tock() - i.e. right after A-Frame's own
+    // renderer.render() for this frame, not on a separately-timed loop.
     const outputCanvas = document.getElementById('outputCanvas');
-    const ctx = outputCanvas.getContext('2d');
     const debugOverlay = document.getElementById('debugOverlay');
 
     // Show ~last 5 errors on screen (not just console) so this is debuggable on a phone
@@ -262,50 +291,41 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
       } else {
         lastErrorMsg = msg;
         errorRepeatCount = 1;
-        console.error('renderLoop error:', err);
+        console.error('compositeFrame error:', err);
         debugOverlay.style.display = 'block';
-        debugOverlay.textContent = 'renderLoop error: ' + msg;
+        debugOverlay.textContent = 'compositeFrame error: ' + msg;
       }
     }
 
-    function renderLoop() {
+    window.compositeFrame = function (sceneEl, outCanvas, ctx) {
       try {
         const video = document.querySelector('video');       // AR.js camera feed
-        const sceneEl = document.querySelector('a-scene');
-        const glCanvas = sceneEl && sceneEl.canvas;           // A-Frame's WebGL canvas
+        const glCanvas = sceneEl.canvas;                      // A-Frame's WebGL canvas
 
         const videoReady = video && video.readyState >= 2;
         const glReady = glCanvas && glCanvas.width > 0 && glCanvas.height > 0;
 
         if (videoReady && glReady) {
-          if (outputCanvas.width !== glCanvas.width || outputCanvas.height !== glCanvas.height) {
-            outputCanvas.width = glCanvas.width;
-            outputCanvas.height = glCanvas.height;
+          if (outCanvas.width !== glCanvas.width || outCanvas.height !== glCanvas.height) {
+            outCanvas.width = glCanvas.width;
+            outCanvas.height = glCanvas.height;
           }
 
           // 1. Camera feed (bottom layer)
-          ctx.drawImage(video, 0, 0, outputCanvas.width, outputCanvas.height);
+          ctx.drawImage(video, 0, 0, outCanvas.width, outCanvas.height);
 
           // 2. 3D model on top (transparent bg lets video show through)
-          ctx.drawImage(glCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
+          ctx.drawImage(glCanvas, 0, 0, outCanvas.width, outCanvas.height);
 
           // 3. Effects
           if (glitchEnabled) {
-            glitchEffect(ctx, outputCanvas, 0.45); // 3rd param = intensity, 0 to 1
+            glitchEffect(ctx, outCanvas, 0.45); // 3rd param = intensity, 0 to 1
           }
         }
       } catch (err) {
-        // IMPORTANT: this is almost certainly why the effect wasn't showing before.
-        // Any error thrown in here used to silently stop requestAnimationFrame forever,
-        // since the call to schedule the next frame lived after this code, unprotected.
         reportError(err);
       }
-
-      // Always keep the loop alive, even if this frame errored.
-      requestAnimationFrame(renderLoop);
-    }
-
-    renderLoop();
+    };
   </script>
 
 </body>
