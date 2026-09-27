@@ -133,7 +133,7 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
           outputCanvas.width = glCanvas.width;
           outputCanvas.height = glCanvas.height;
         }
-        glitchEffect(ctx, outputCanvas, 0.45); // 3rd param = intensity, 0 to 1
+    
         // 1. Camera feed (bottom layer)
         ctx.drawImage(video, 0, 0, outputCanvas.width, outputCanvas.height);
 
