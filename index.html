@@ -11,7 +11,64 @@
   <!-- AR.js for A-Frame -->
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
 
- 
+  <!--glitch Effect-->
+  <script>
+function glitchEffect(ctx, canvas, intensity = 0.4) {
+  const w = canvas.width, h = canvas.height;
+  const amt = Math.max(0, Math.min(1, intensity));
+  if (amt <= 0) return;
+
+  const frame = ctx.getImageData(0, 0, w, h);
+  const data = frame.data;
+  const shift = Math.round(amt * 12);
+  if (shift > 0) {
+    const copy = new Uint8ClampedArray(data);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 4;
+        const rx = Math.min(w - 1, x + shift);
+        const bx = Math.max(0, x - shift);
+        data[idx]     = copy[(y * w + rx) * 4];
+        data[idx + 2] = copy[(y * w + bx) * 4 + 2];
+      }
+    }
+  }
+  ctx.putImageData(frame, 0, 0);
+
+  const sliceCount = Math.round(amt * 8);
+  for (let i = 0; i < sliceCount; i++) {
+    if (Math.random() > 0.5) continue;
+    const sy = Math.floor(Math.random() * h);
+    const sh = Math.max(2, Math.floor(Math.random() * h * 0.08));
+    const dx = Math.floor((Math.random() - 0.5) * amt * 60);
+    ctx.drawImage(canvas, 0, sy, w, sh, dx, sy, w, sh);
+  }
+
+  ctx.globalAlpha = 0.15 * amt;
+  ctx.fillStyle = '#000';
+  for (let y = 0; y < h; y += 3) ctx.fillRect(0, y, w, 1);
+  ctx.globalAlpha = 1;
+
+  if (Math.random() < amt * 0.15) {
+    const nd = ctx.getImageData(0, 0, w, h);
+    const nData = nd.data;
+    for (let i = 0; i < nData.length; i += 4) {
+      if (Math.random() < 0.02) {
+        const v = Math.random() * 255;
+        nData[i] = v; nData[i + 1] = v; nData[i + 2] = v;
+      }
+    }
+    ctx.putImageData(nd, 0, 0);
+  }
+
+  if (Math.random() < amt * 0.08) {
+    ctx.globalAlpha = 0.1;
+    ctx.fillStyle = Math.random() < 0.5 ? '#ff003c' : '#00e5ff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalAlpha = 1;
+  }
+}
+</script>
 
   <style>
     body { margin: 0; overflow: hidden; }
@@ -47,7 +104,7 @@
     <!-- Marker: default "Hiro" pattern marker -->
     <a-marker preset="hiro">
       <a-entity
-        gltf-model="model.glb"
+        gltf-model="bodys_test.glb"
         position="0 0 0"
         scale="0.05 0.05 0.05"
         rotation="0 0 0"
@@ -76,7 +133,7 @@
           outputCanvas.width = glCanvas.width;
           outputCanvas.height = glCanvas.height;
         }
-    
+        glitchEffect(ctx, outputCanvas, 0.45); // 3rd param = intensity, 0 to 1
         // 1. Camera feed (bottom layer)
         ctx.drawImage(video, 0, 0, outputCanvas.width, outputCanvas.height);
 
