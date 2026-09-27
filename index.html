@@ -104,6 +104,9 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
   <button id="rawViewToggle" style="position: fixed; top: 8px; right: 8px; z-index: 10001; font: 12px sans-serif; padding: 6px 10px;">
     Show raw A-Frame view
   </button>
+  <button id="glitchToggle" style="position: fixed; top: 44px; right: 8px; z-index: 10001; font: 12px sans-serif; padding: 6px 10px;">
+    Disable glitch effect
+  </button>
   <div id="debugOverlay"></div>
 
   <a-scene
@@ -152,9 +155,33 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
       rawViewToggle.textContent = showingRaw ? 'Show glitch/composited view' : 'Show raw A-Frame view';
     });
 
+    // TEMP DIAGNOSTIC: disable just the glitch effect while keeping OUR custom
+    // drawImage(video) + drawImage(glCanvas) compositing active. If the model
+    // shows up with glitch off (still going through our canvas), the bug is
+    // in glitchEffect(). If it's still invisible, drawImage(glCanvas) itself
+    // isn't capturing the model - most likely an alpha/premultiplied-alpha
+    // issue reading the WebGL canvas into the 2D canvas.
+    let glitchEnabled = true;
+    const glitchToggle = document.getElementById('glitchToggle');
+    glitchToggle.addEventListener('click', function () {
+      glitchEnabled = !glitchEnabled;
+      glitchToggle.textContent = glitchEnabled ? 'Disable glitch effect' : 'Enable glitch effect';
+    });
+
     // Hide loader once the scene is ready
     document.querySelector('a-scene').addEventListener('loaded', function () {
       document.querySelector('.arjs-loader').style.display = 'none';
+
+      // Force a solid, distinctive background instead of relying on the
+      // WebGL canvas's alpha channel surviving the copy into our 2D canvas
+      // (that channel is premultiplied internally and drawImage from a
+      // WebGL canvas into a 2D canvas doesn't reliably un-premultiply it
+      // across all browsers). We chroma-key this exact color out manually
+      // in extractModelLayer() below instead.
+      const sceneEl = document.querySelector('a-scene');
+      if (sceneEl.object3D) {
+        sceneEl.object3D.background = new THREE.Color(1, 0, 1); // magenta
+      }
     });
 
     // TEMP DIAGNOSTIC: surface glTF load success/failure on screen.
@@ -263,7 +290,9 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
           ctx.drawImage(glCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
 
           // 3. Effects
-          glitchEffect(ctx, outputCanvas, 0.45); // 3rd param = intensity, 0 to 1
+          if (glitchEnabled) {
+            glitchEffect(ctx, outputCanvas, 0.45); // 3rd param = intensity, 0 to 1
+          }
         }
       } catch (err) {
         // IMPORTANT: this is almost certainly why the effect wasn't showing before.
