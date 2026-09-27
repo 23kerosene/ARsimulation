@@ -152,8 +152,31 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
     }
     ['model-on-marker', 'model-test-fixed'].forEach(function (id) {
       const el = document.getElementById(id);
-      el.addEventListener('model-loaded', function () {
+      el.addEventListener('model-loaded', function (e) {
         showDebug('[' + id + '] model-loaded OK');
+
+        // TEMP DIAGNOSTIC: measure the model's actual size/center so we know
+        // whether the problem is scale, an off-center pivot, or something else.
+        const obj = e.detail.model;
+        const box = new THREE.Box3().setFromObject(obj);
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        box.getSize(size);
+        box.getCenter(center);
+        showDebug('[' + id + '] raw size: ' +
+          size.x.toFixed(3) + ' x ' + size.y.toFixed(3) + ' x ' + size.z.toFixed(3) +
+          '  center offset: ' + center.x.toFixed(3) + ',' + center.y.toFixed(3) + ',' + center.z.toFixed(3));
+
+        // Defensive fixes for two common "loaded but invisible" causes:
+        // 1) exporters sometimes leave frustumCulled bounding spheres wrong, so
+        //    a visible mesh gets culled as if it were off-screen.
+        // 2) single-sided materials disappear when you're viewing the "inside".
+        obj.traverse(function (node) {
+          if (node.isMesh) {
+            node.frustumCulled = false;
+            if (node.material) node.material.side = THREE.DoubleSide;
+          }
+        });
       });
       el.addEventListener('model-error', function (e) {
         showDebug('[' + id + '] model-error: ' + (e.detail && e.detail.src) + ' - ' + (e.detail && e.detail.format));
