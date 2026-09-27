@@ -167,7 +167,28 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
           size.x.toFixed(3) + ' x ' + size.y.toFixed(3) + ' x ' + size.z.toFixed(3) +
           '  center offset: ' + center.x.toFixed(3) + ',' + center.y.toFixed(3) + ',' + center.z.toFixed(3));
 
-        // Defensive fixes for two common "loaded but invisible" causes:
+        // AUTO-FIT: the debug numbers showed the model rendering at ~22 units
+        // tall (marker size is ~1 unit) - it was almost certainly enormous and
+        // enveloping the camera, which is why nothing recognizable was visible.
+        // Instead of hand-guessing a scale value, rescale it to a sane target
+        // size automatically, then sit it on the ground (y=0) based on its
+        // actual measured bottom edge.
+        const targetHeight = 0.5; // desired height in AR.js world units; tweak to taste
+        if (size.y > 0) {
+          const fitScale = targetHeight / size.y;
+          const s = el.object3D.scale;
+          el.object3D.scale.set(s.x * fitScale, s.y * fitScale, s.z * fitScale);
+          el.object3D.updateMatrixWorld(true);
+
+          const refit = new THREE.Box3().setFromObject(obj);
+          const bottomY = refit.min.y;
+          el.object3D.position.y -= bottomY; // ground it at y = 0
+
+          showDebug('[' + id + '] auto-fit: scaled x' + fitScale.toFixed(5) +
+            ', grounded (shifted y by ' + (-bottomY).toFixed(3) + ')');
+        }
+
+        // Defensive fixes for two other common "loaded but invisible" causes:
         // 1) exporters sometimes leave frustumCulled bounding spheres wrong, so
         //    a visible mesh gets culled as if it were off-screen.
         // 2) single-sided materials disappear when you're viewing the "inside".
