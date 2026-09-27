@@ -165,18 +165,7 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
       ></a-entity>
     </a-marker>
 
-    <!-- TEMP DIAGNOSTIC: same model, always visible in front of the camera,
-         with no marker required. If this shows up but the one on the marker
-         doesn't, the model itself is fine and it's a marker-tracking problem.
-         If this ALSO never appears, the model isn't loading. Remove this
-         whole <a-entity> once you've confirmed which case you're in. -->
-    <a-entity
-      id="model-test-fixed"
-      gltf-model="bodys_test.glb"
-      position="0 0 -1"
-      scale="0.1 0.1 0.1"
-      rotation="0 0 0"
-    ></a-entity>
+
 
     <a-entity camera></a-entity>
   </a-scene>
