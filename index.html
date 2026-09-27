@@ -165,14 +165,47 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
       ></a-entity>
     </a-marker>
 
-
+    <!-- TEMP DIAGNOSTIC: same model, always visible in front of the camera,
+         with no marker required. If this shows up but the one on the marker
+         doesn't, the model itself is fine and it's a marker-tracking problem.
+         If this ALSO never appears, the model isn't loading. Remove this
+         whole <a-entity> once you've confirmed which case you're in. -->
+    <a-entity
+      id="model-test-fixed"
+      gltf-model="bodys_test.glb"
+      position="0 0 -1"
+      scale="0.1 0.1 0.1"
+      rotation="0 0 0"
+    ></a-entity>
 
     <a-entity camera></a-entity>
   </a-scene>
 
   <script>
+    // TEMP DIAGNOSTIC: toggle the compositing canvas off entirely, so you can
+    // see A-Frame/AR.js's native render (no glitch, no custom compositing)
+    // underneath. If the model shows up here but never in the composited
+    // view, the bug is in the compositing/glitch pipeline, not the 3D scene.
+    const rawViewToggle = document.getElementById('rawViewToggle');
+    let showingRaw = false;
+    rawViewToggle.addEventListener('click', function () {
+      showingRaw = !showingRaw;
+      outputCanvas.style.display = showingRaw ? 'none' : 'block';
+      rawViewToggle.textContent = showingRaw ? 'Show glitch/composited view' : 'Show raw A-Frame view';
+    });
 
-    
+    // TEMP DIAGNOSTIC: disable just the glitch effect while keeping OUR custom
+    // drawImage(video) + drawImage(glCanvas) compositing active. If the model
+    // shows up with glitch off (still going through our canvas), the bug is
+    // in glitchEffect(). If it's still invisible, drawImage(glCanvas) itself
+    // isn't capturing the model - most likely an alpha/premultiplied-alpha
+    // issue reading the WebGL canvas into the 2D canvas.
+    let glitchEnabled = true;
+    const glitchToggle = document.getElementById('glitchToggle');
+    glitchToggle.addEventListener('click', function () {
+      glitchEnabled = !glitchEnabled;
+      glitchToggle.textContent = glitchEnabled ? 'Disable glitch effect' : 'Enable glitch effect';
+    });
 
     // Hide loader once the scene is ready
     document.querySelector('a-scene').addEventListener('loaded', function () {
@@ -210,7 +243,7 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
         // Instead of hand-guessing a scale value, rescale it to a sane target
         // size automatically, then sit it on the ground (y=0) based on its
         // actual measured bottom edge.
-        const targetHeight = 3; // desired height in AR.js world units; tweak to taste
+        const targetHeight = 0.5; // desired height in AR.js world units; tweak to taste
         if (size.y > 0) {
           const fitScale = targetHeight / size.y;
           const s = el.object3D.scale;
