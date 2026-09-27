@@ -168,7 +168,7 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
     // on viewing angle.
     (function () {
       const el = document.getElementById('model-on-marker');
-      const targetHeight = 0.5; // desired height in AR.js world units; tweak to taste
+      const targetHeight = 2; // desired height in AR.js world units; tweak to taste
 
       el.addEventListener('model-loaded', function (e) {
         const obj = e.detail.model;
