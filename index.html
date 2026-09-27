@@ -11,7 +11,7 @@
   <!-- AR.js for A-Frame -->
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
 
-    <!--glitch effect-->
+  <!--glitch Effect-->
   <script>
 function glitchEffect(ctx, canvas, intensity = 0.4) {
   const w = canvas.width, h = canvas.height;
@@ -93,23 +93,23 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
     <div>Loading AR experience...</div>
   </div>
 
+  <canvas id="outputCanvas" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 5;"></canvas>
+
   <a-scene
     vr-mode-ui="enabled: false"
     embedded
     arjs="sourceType: webcam; debugUIEnabled: false;"
-    renderer="logarithmicDepthBuffer: true;"
+    renderer="logarithmicDepthBuffer: true; preserveDrawingBuffer: true;"
   >
     <!-- Marker: default "Hiro" pattern marker -->
     <a-marker preset="hiro">
       <a-entity
-        gltf-model="bodys_test.glb"
+        gltf-model="model.glb"
         position="0 0 0"
-        scale="0.1 0.1 0.1"
+        scale="0.05 0.05 0.05"
         rotation="0 0 0"
       ></a-entity>
     </a-marker>
-
-    glitchEffect(ctx, canvas, 0.45); // 3rd param = intensity, 0 to 1
 
     <a-entity camera></a-entity>
   </a-scene>
@@ -120,7 +120,40 @@ function glitchEffect(ctx, canvas, intensity = 0.4) {
       document.querySelector('.arjs-loader').style.display = 'none';
     });
 
-    
+    // Continuously draw the camera video + WebGL scene onto a single canvas
+    const outputCanvas = document.getElementById('outputCanvas');
+    const ctx = outputCanvas.getContext('2d');
+
+    function renderLoop() {
+      const video = document.querySelector('video');       // AR.js camera feed
+      const glCanvas = document.querySelector('a-scene').canvas; // A-Frame's WebGL canvas
+
+      if (video && video.readyState >= 2) { // video has data
+        if (outputCanvas.width !== glCanvas.width || outputCanvas.height !== glCanvas.height) {
+          outputCanvas.width = glCanvas.width;
+          outputCanvas.height = glCanvas.height;
+        }
+
+        // 1. Camera feed (bottom layer)
+        ctx.drawImage(video, 0, 0, outputCanvas.width, outputCanvas.height);
+
+        // 2. 3D model on top (transparent bg lets video show through)
+        ctx.drawImage(glCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
+
+        // 3. Apply your effects here, e.g.:
+        // ctx.filter = 'grayscale(100%)';
+        // or manipulate pixels directly:
+        // const frame = ctx.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
+        // ... modify frame.data ...
+        // ctx.putImageData(frame, 0, 0);
+        // wherever your AR frame is drawn to your existing canvas/context, add this one line after it:
+        glitchEffect(ctx, outputCanvas, 0.45); // 3rd param = intensity, 0 to 1
+      }
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    renderLoop();
   </script>
 
 </body>
